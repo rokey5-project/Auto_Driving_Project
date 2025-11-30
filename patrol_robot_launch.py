@@ -16,7 +16,12 @@ def generate_launch_description():
             package='my_robot_pkg',
             executable='detect_person_node',
             name='detect_person_node',
-            output='screen'
+            output='screen',
+            namespace='/robot6',
+            remappings=[
+                ('/tf', '/robot6/tf'),
+                ('/tf_static', '/robot6/tf_static')
+            ],
         ),
 
         # 부저 컨트롤러 노드
