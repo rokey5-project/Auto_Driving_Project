@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 from glob import glob
 
-package_name = 'patrol_robot_B'
+package_name = 'patrol_robot_b'
 
 setup(
     name=package_name,
@@ -26,9 +26,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'patrol_node: patrol_robot_B.patrol_node:main',
-            'detect_person_node: patrol_robot_B.detect_person_node:main',
-            'buzzer_node: patrol_robot_B.buzzer_node:main',
+            'patrol_node: patrol_robot_b.patrol_node:main',
+            'detect_person_node: patrol_robot_b.detect_person_node:main',
+            'buzzer_node: patrol_robot_b.buzzer_node:main',
         ],
     },
 )
