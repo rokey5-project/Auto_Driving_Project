@@ -26,9 +26,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'patrol_node: patrol_robot_b.patrol_node:main',
-            'detect_person_node: patrol_robot_b.detect_person_node:main',
-            'buzzer_node: patrol_robot_b.buzzer_node:main',
+            'patrol_node = patrol_robot_b.patrol_node:main',
+            'detect_person_node = patrol_robot_b.detect_person_node:main',
+            'buzzer_node = patrol_robot_b.buzzer_node:main',
         ],
     },
 )
