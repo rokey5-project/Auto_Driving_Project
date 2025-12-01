@@ -5,7 +5,7 @@ def generate_launch_description():
     return LaunchDescription([
         # 순찰 네비게이션 노드
         Node(
-            package='my_robot_pkg',
+            package='patrol_robot_B',
             executable='patrol_node',
             name='patrol_node',
             output='screen'
@@ -13,7 +13,7 @@ def generate_launch_description():
 
         # 사람 탐지 노드 (YOLO)
         Node(
-            package='my_robot_pkg',
+            package='patrol_robot_B',
             executable='detect_person_node',
             name='detect_person_node',
             output='screen',
@@ -26,7 +26,7 @@ def generate_launch_description():
 
         # 부저 컨트롤러 노드
         Node(
-            package='my_robot_pkg',
+            package='patrol_robot_B',
             executable='buzzer_node',
             name='buzzer_node',
             output='screen'
