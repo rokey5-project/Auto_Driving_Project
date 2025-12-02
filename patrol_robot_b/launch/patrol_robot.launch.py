@@ -3,6 +3,7 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
+    namespace = LaunchConfiguration('namespace', default='')
 
     return LaunchDescription([
         # 순찰 네비게이션 노드
@@ -10,7 +11,7 @@ def generate_launch_description():
             package='patrol_robot_b',
             executable='patrol_node',
             name='patrol_node',
-            namespace='/robot6',
+            namespace=namespace,
             output='screen'
         ),
 
@@ -19,11 +20,11 @@ def generate_launch_description():
             package='patrol_robot_b',
             executable='detect_person_node',
             name='detect_person_node',
+            namespace=namespace,
             output='screen',
-            namespace='/robot6',
             remappings=[
-                ('/tf', '/robot6/tf'),
-                ('/tf_static', '/robot6/tf_static')
+                ('/tf', [namespace, '/tf']),
+                ('/tf_static', [namespace, '/tf_static'])
             ],
         ),
 
@@ -32,7 +33,7 @@ def generate_launch_description():
             package='patrol_robot_b',
             executable='buzzer_node',
             name='buzzer_node',
-            namespace='/robot6',
+            namespace=namespace,
             output='screen'
         ),
     ])
