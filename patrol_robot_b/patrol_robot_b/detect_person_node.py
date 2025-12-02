@@ -29,14 +29,12 @@ class DetectPersonNode(Node):
         self.rgb_image_stamp = None
         self.shutdown_requested = False
         self.is_detect_person = False
-        self.is_close = False
-        
+        self.is_arrived = False
         self.navigator = TurtleBot4Navigator()
 
         self.model = YOLO("./yolov8n.pt")
         
         # buffer
-
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
 
@@ -47,6 +45,7 @@ class DetectPersonNode(Node):
 
         # publisher
         self.person_pub = self.create_publisher(Bool, "/person_detected", 10)
+        self.arrived_pub = self.create_publisher(Bool, "/is_arrived", 10)
 
         # subscriptions
         self.create_subscription(CameraInfo, '/robot6/oakd/rgb/camera_info', self.camera_info_callback, 5)
@@ -58,7 +57,7 @@ class DetectPersonNode(Node):
 
     def start_transform(self):
         self.get_logger().info("TF Tree 안정화 완료. 변환 시작합니다.")
-        self.timer = self.create_timer(1, self.process_frame)
+        self.timer = self.create_timer(0.3, self.process_frame)
         self.start_timer.cancel()
 
     def camera_info_callback(self, msg):
@@ -88,10 +87,16 @@ class DetectPersonNode(Node):
         if self.K is None or self.rgb_image is None or self.depth_image is None:
             print('camera is not working')
             return
-
+        
         frame = self.rgb_image.copy()
         frame_id = getattr(self, 'camera_frame', None)
         h, w, _ = frame.shape
+        
+        self.display_frame = frame
+        self.is_arrived = False
+        arrived_msg = Bool()
+        arrived_msg.data = self.is_arrived
+        self.arrived_pub.publish(arrived_msg)
 
         # 구역 외 사람 detect 방지하기 위한 이미지 cropping
         y_start = int(0.4 * h) 
@@ -114,7 +119,7 @@ class DetectPersonNode(Node):
         robot_x = t.transform.translation.x
         robot_y = t.transform.translation.y
 
-        self.target_distance = 0.3
+        self.target_distance = 0.5
         
         
         for det in results.boxes:
@@ -182,10 +187,13 @@ class DetectPersonNode(Node):
                     robot_w = t.transform.rotation.w
                     goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=robot_z, w=robot_w)
 
-                    self.navigator.goToPose(goal_pose)
-                    self.get_logger().info("Sent navigation goal to map coordinate.")
-                else:
-                    self.is_detect_person = False
+                    if self.navigator.isTaskComplete():
+                        self.navigator.goToPose(goal_pose)
+                        self.get_logger().info("Sent navigation goal to map coordinate.")
+                        self.is_arrived = True
+                        arrived_msg.data = self.is_arrived
+                        self.arrived_pub.publish(arrived_msg)
+                        
                     
                 msg = Bool()
                 msg.data = self.is_detect_person

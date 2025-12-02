@@ -11,7 +11,7 @@ class PatrolNode(Node):
 
 
         self.create_subscription(Bool, "/person_detected", self.person_callback, 10)
-        self.create_subscription(Bool, '/fire_state', self.fire_callback, 10)
+        self.create_subscription(Bool, '/cam/fire_detection_status', self.fire_callback, 10)
 
         self.position_index = 0
         # 토픽 받아오는걸로 변경 필요
@@ -25,7 +25,6 @@ class PatrolNode(Node):
         self.navigator.setInitialPose(initial_pose)
         self.get_logger().info("Nav2 active, waiting for initial pose...")
         self.navigator.undock()
-
         self.goal_pose = []
 
         self.goal_pose.append(self.navigator.getPoseStamped([0.01164, 1.536432], TurtleBot4Directions.SOUTH))

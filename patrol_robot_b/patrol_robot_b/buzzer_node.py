@@ -12,8 +12,10 @@ class BuzzerNode(Node):
         
         # subscription
         self.create_subscription(Bool, "/person_detected", self.person_detected_callback, 10)
+        self.create_subscription(Bool, "/is_arrived", self.person_detected_callback, 10)
         
         self.is_detect_person = False
+        self.is_arrived = False
 
         self.audio_msg = AudioNoteVector()
         
@@ -33,10 +35,15 @@ class BuzzerNode(Node):
 
     def person_detected_callback(self, msg):
         self.is_detect_person = msg.data
+            
+    def is_arrived_callback(self, msg):
+        self.is_arrived = msg.data
         
-        if self.is_detect_person:
+        if self.is_arrived:
             self.alarm_publisher.publish(self.audio_msg)
             self.get_logger().info("🔊 삐뽀 재생!")
+        
+        
 
 def main(args=None):
     rclpy.init(args=args)
