@@ -8,7 +8,7 @@ class BuzzerNode(Node):
         super().__init__('buzzer_node')
 
         # publisher
-        self.alarm_publisher = self.create_publisher(AudioNoteVector, '/cmd_audio', 10)
+        self.alarm_publisher = self.create_publisher(AudioNoteVector, 'cmd_audio', 10)
         
         # subscription
         self.create_subscription(Bool, "/person_detected", self.person_detected_callback, 10)

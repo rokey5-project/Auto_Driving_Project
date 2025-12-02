@@ -29,6 +29,7 @@ class DetectPersonNode(Node):
         self.rgb_image_stamp = None
         self.shutdown_requested = False
         self.is_detect_person = False
+        self.is_close = False
         
         self.navigator = TurtleBot4Navigator()
 
@@ -206,7 +207,6 @@ class DetectPersonNode(Node):
             time.sleep(0.01)
 
 def main():
-    # nav_to_point1()
     rclpy.init()
     node = DetectPersonNode()
 

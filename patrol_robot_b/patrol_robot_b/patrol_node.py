@@ -40,10 +40,6 @@ class PatrolNode(Node):
     def person_callback(self, msg):
         self.is_detect_person = msg.data
         
-    def fire_callback(self, msg):
-        self.fire_state = msg.data
-
-    def patrol_loop(self):
         # patrol 종료
         if not self.navigator.getDockedStatus() and not self.fire_state:
             self.navigator.dock()
@@ -61,6 +57,10 @@ class PatrolNode(Node):
             
             self.navigator.startToPose(goal)
             self.get_logger().info(f"순찰 진행: 목표 지점 {self.position_index}")
+        
+    def fire_callback(self, msg):
+        self.fire_state = msg.data
+
         
 def main(args=None):
     rclpy.init(args=args)
