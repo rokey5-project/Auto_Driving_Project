@@ -2,29 +2,27 @@ import rclpy
 from rclpy.node import Node
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 from std_msgs.msg import Bool
-import time
-
 
 class PatrolNode(Node):
     def __init__(self):
         super().__init__('patrol_node')
 
 
-        self.create_subscription(Bool, "/person_detected", self.person_callback, 10)
         self.create_subscription(Bool, '/cam/fire_detection_status', self.fire_callback, 10)
+        self.create_subscription(Bool, "/is_guiding", self.guiding_callback, 10)
 
         self.position_index = 0
         # 토픽 받아오는걸로 변경 필요
         self.fire_state = True
-        self.is_detect_person = False
+        self.is_guiding = False
 
         self.navigator = TurtleBot4Navigator()
         self.navigator.waitUntilNav2Active()
         
         initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.EAST)
         self.navigator.setInitialPose(initial_pose)
-        self.get_logger().info("Nav2 active, waiting for initial pose...")
         self.navigator.undock()
+        
         self.goal_pose = []
 
         self.goal_pose.append(self.navigator.getPoseStamped([0.01164, 1.536432], TurtleBot4Directions.SOUTH))
@@ -33,33 +31,35 @@ class PatrolNode(Node):
         self.goal_pose.append(self.navigator.getPoseStamped([-1.641019, -0.19269], TurtleBot4Directions.EAST))
         self.goal_pose.append(self.navigator.getPoseStamped([-0.015362, 0.440271], TurtleBot4Directions.WEST))
 
-        self.timer = self.create_timer(0.5, self.patrol_loop)
-        
-
-    def person_callback(self, msg):
-        self.is_detect_person = msg.data
-        
-        # patrol 종료
-        if not self.navigator.getDockedStatus() and not self.fire_state:
-            self.navigator.dock()
-            self.get_logger().info("🔥 화재 없음. 도킹 상태")
-            return
-        
-        # person detect 시 일시 정지
-        if self.is_detect_person:
-            self.get_logger().info("🚨 사람 발견! 순찰 정지")
-            self.navigator.stop()
-        
-        if self.navigator.isTaskComplete():
-            self.position_index = (self.position_index + 1) % len(self.goal_pose)
-            goal = self.goal_pose[self.position_index]
-            
-            self.navigator.startToPose(goal)
-            self.get_logger().info(f"순찰 진행: 목표 지점 {self.position_index}")
-        
     def fire_callback(self, msg):
         self.fire_state = msg.data
-
+        
+    def guiding_callback(self, msg):
+        self.is_guiding = msg.data
+        
+        if not self.is_guiding:
+            # patrol 종료
+            if not self.navigator.getDockedStatus() and not self.fire_state:
+                self.navigator.dock()
+                self.get_logger().info("🔥 화재 없음. 도킹 상태")
+                return
+            
+            # person detect 후 이동 중
+            if self.is_guiding:
+                self.get_logger().info("🚨 사람 발견! 순찰 정지")
+                self.navigator.cancelTask()
+            # 순찰 재개
+            else:
+                self.get_logger().info(f"순찰 시작: 목표 지점 {self.position_index}")
+                goal = self.goal_pose[self.position_index]
+                self.navigator.startToPose(goal)
+                    
+                if self.navigator.getResult() != 2:
+                    if self.position_index + 1 >= len(self.goal_pose):
+                        self.position_index = 0
+                    else:
+                        self.position_index = self.position_index + 1
+        
         
 def main(args=None):
     rclpy.init(args=args)

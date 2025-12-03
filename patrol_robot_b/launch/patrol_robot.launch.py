@@ -6,15 +6,6 @@ def generate_launch_description():
     namespace = LaunchConfiguration('namespace', default='')
 
     return LaunchDescription([
-        # 순찰 네비게이션 노드
-        Node(
-            package='patrol_robot_b',
-            executable='patrol_node',
-            name='patrol_node',
-            namespace=namespace,
-            output='screen'
-        ),
-
         # 사람 탐지 노드 (YOLO)
         Node(
             package='patrol_robot_b',
@@ -26,6 +17,15 @@ def generate_launch_description():
                 ('/tf', [namespace, '/tf']),
                 ('/tf_static', [namespace, '/tf_static'])
             ],
+        ),
+        
+        # 순찰 네비게이션 노드
+        Node(
+            package='patrol_robot_b',
+            executable='patrol_node',
+            name='patrol_node',
+            namespace=namespace,
+            output='screen'
         ),
 
         # 부저 컨트롤러 노드

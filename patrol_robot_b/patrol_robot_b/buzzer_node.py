@@ -11,10 +11,8 @@ class BuzzerNode(Node):
         self.alarm_publisher = self.create_publisher(AudioNoteVector, 'cmd_audio', 10)
         
         # subscription
-        self.create_subscription(Bool, "/person_detected", self.person_detected_callback, 10)
-        self.create_subscription(Bool, "/is_arrived", self.person_detected_callback, 10)
+        self.create_subscription(Bool, "/is_arrived", self.is_arrived_callback, 10)
         
-        self.is_detect_person = False
         self.is_arrived = False
 
         self.audio_msg = AudioNoteVector()
@@ -32,9 +30,6 @@ class BuzzerNode(Node):
             note.max_runtime.sec = 0
             note.max_runtime.nanosec = duration_sec
             self.audio_msg.notes.append(note)
-
-    def person_detected_callback(self, msg):
-        self.is_detect_person = msg.data
             
     def is_arrived_callback(self, msg):
         self.is_arrived = msg.data
