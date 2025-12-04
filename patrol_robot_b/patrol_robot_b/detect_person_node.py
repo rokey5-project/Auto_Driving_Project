@@ -141,7 +141,6 @@ class DetectPersonNode(Node):
 
                 if label.lower() == "person":
                     self.get_logger().info('사람 감지')
-                    self.is_guiding = True
                     
                     conf = float(det.conf[0])
                     x1, y1, x2, y2 = map(int, det.xyxy[0].tolist())
@@ -208,9 +207,6 @@ class DetectPersonNode(Node):
                         self.is_guiding = True
                     
                 if self.is_guiding:
-                    
-                    self.get_logger().info(f"is_task: {self.navigator.isTaskComplete()}, is_arrive: {self.is_arrived}")
-                    
                     # 이동 진행중
                     if not self.approach_action:
                         self.is_arrived = False
