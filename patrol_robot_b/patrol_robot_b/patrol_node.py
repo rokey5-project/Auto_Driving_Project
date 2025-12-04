@@ -30,40 +30,50 @@ class PatrolNode(Node):
         self.goal_pose.append(self.navigator.getPoseStamped([-2.942057, -0.05439], TurtleBot4Directions.NORTH))
         self.goal_pose.append(self.navigator.getPoseStamped([-1.641019, -0.19269], TurtleBot4Directions.EAST))
         self.goal_pose.append(self.navigator.getPoseStamped([-0.015362, 0.440271], TurtleBot4Directions.WEST))
+        
+        self.create_timer(0.2, self.patrol_loop) 
+        
 
     def fire_callback(self, msg):
         self.fire_state = msg.data
         
     def guiding_callback(self, msg):
-        self.is_guiding = msg.data
         
-        if not self.is_guiding:
-            # patrol 종료
-            if not self.navigator.getDockedStatus() and not self.fire_state:
-                self.navigator.dock()
-                self.get_logger().info("🔥 화재 없음. 도킹 상태")
-                return
+        if self.is_guiding != msg.data:
+            self.is_guiding = msg.data
             
-            # person detect 후 이동 중
             if self.is_guiding:
                 self.get_logger().info("🚨 사람 발견! 순찰 정지")
                 self.navigator.cancelTask()
-            # 순찰 재개
-            else:
-                self.get_logger().info(f"순찰 시작: 목표 지점 {self.position_index}")
-                goal = self.goal_pose[self.position_index]
-                self.navigator.startToPose(goal)
-                    
-                if self.navigator.getResult() != 2:
-                    if self.position_index + 1 >= len(self.goal_pose):
-                        self.position_index = 0
-                    else:
-                        self.position_index = self.position_index + 1
+        
+    def patrol_loop(self):
+        if not self.navigator.isTaskComplete():
+            self.get_logger().info('순찰중입니다!!')
+            return
+            
+        if not self.navigator.getDockedStatus() and not self.fire_state:
+            self.navigator.dock()
+            self.get_logger().info("🔥 화재 없음. 도킹 상태")
+            return
+        
+        if not self.is_guiding:    
+            self.get_logger().info(f"순찰 시작: 목표 지점 {self.position_index}")
+            goal = self.goal_pose[self.position_index]
+            self.navigator.goToPose(goal)
+                
+            if self.navigator.getResult() != 2:
+                if self.position_index + 1 >= len(self.goal_pose):
+                    self.position_index = 0
+                else:
+                    self.position_index = self.position_index + 1
         
         
 def main(args=None):
     rclpy.init(args=args)
     node = PatrolNode()
+    
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
     
     try:
         rclpy.spin(node)

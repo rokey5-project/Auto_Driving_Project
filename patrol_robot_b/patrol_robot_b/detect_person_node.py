@@ -14,6 +14,7 @@ from sensor_msgs.msg import Image, CameraInfo, CompressedImage
 from geometry_msgs.msg import PointStamped, PoseStamped, Quaternion
 from std_msgs.msg import Bool
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Navigator, TurtleBot4Directions
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import tf2_geometry_msgs 
 
 
@@ -32,6 +33,9 @@ class DetectPersonNode(Node):
         self.is_navigating = False
         self.is_arrived = False
         self.is_guiding = False
+        
+        self.approach_action = False
+        self.shelter_action = False
                 
         self.navigator = TurtleBot4Navigator()
 
@@ -49,11 +53,17 @@ class DetectPersonNode(Node):
         # publisher
         self.arrived_pub = self.create_publisher(Bool, "/is_arrived", 10)
         self.guiding_pub = self.create_publisher(Bool, "/is_guiding", 10)
+        
+        qos = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
 
         # subscriptions
-        self.create_subscription(CameraInfo, '/robot6/oakd/rgb/camera_info', self.camera_info_callback, 10)
-        self.create_subscription(CompressedImage, '/robot6/oakd/rgb/image_raw/compressed', self.rgb_callback, 10)
-        self.create_subscription(Image, '/robot6/oakd/stereo/image_raw', self.depth_callback,10)
+        self.create_subscription(CameraInfo, '/robot6/oakd/rgb/camera_info', self.camera_info_callback, qos)
+        self.create_subscription(CompressedImage, '/robot6/oakd/rgb/image_raw/compressed', self.rgb_callback, qos)
+        self.create_subscription(Image, '/robot6/oakd/stereo/image_raw', self.depth_callback,qos)
 
         self.get_logger().info("TF Tree 안정화 시작. 5초 후 변환 시작합니다.")
         self.start_timer = self.create_timer(5.0, self.start_transform)
@@ -62,13 +72,12 @@ class DetectPersonNode(Node):
 
     def start_transform(self):
         self.get_logger().info("TF Tree 안정화 완료. 변환 시작합니다.")
-        self.timer = self.create_timer(0.5, self.process_frame)
+        self.timer = self.create_timer(0.3, self.process_frame)
         self.start_timer.cancel()
 
     def camera_info_callback(self, msg):
         try:
             self.K = np.array(msg.k).reshape(3, 3)
-            self.get_logger().info(f'K',self.K)
         except Exception as e:
             self.get_logger().error(f"카메라 정보 데이터 변환에 실패하였습니다.: {e}")
 
@@ -80,20 +89,18 @@ class DetectPersonNode(Node):
             self.rgb_image = rgb
             self.camera_frame = msg.header.frame_id
             self.rgb_image_stamp = msg.header.stamp
-            self.get_logger().info(f'rgb_img',self.rgb_image)
         except Exception as e:
             self.get_logger().error(f"RGB 이미지 변환에 실패하였습니다.: {e}")
 
     def depth_callback(self, msg):
         try:
             self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
-            self.get_logger().info(f'depth',self.depth_image)
         except Exception as e:
             self.get_logger().error(f"Depth 이미지 변환에 실패하였습니다.:{e}")
 
     def process_frame(self):
         if self.K is None or self.rgb_image is None or self.depth_image is None:
-            self.get_logger().error(f"k : {not self.K is None}, rgb: {not self.rgb_image is None}, depth: {not self.depth_image is None}")
+            self.get_logger().error(f"k : {self.K is None}, rgb: {self.rgb_image is None}, depth: {self.depth_image is None}")
             return
         
         frame = self.rgb_image.copy()
@@ -107,7 +114,7 @@ class DetectPersonNode(Node):
         cropped_frame = frame[y_start:h, 0:w]
         
         # predict
-        results = self.model(cropped_frame, conf=0.5, verbose=False)[0]
+        results = self.model(cropped_frame, conf=0.7, verbose=False)[0]
 
         try:
             t = self.tf_buffer.lookup_transform(
@@ -125,7 +132,7 @@ class DetectPersonNode(Node):
         robot_x = t.transform.translation.x
         robot_y = t.transform.translation.y
 
-        self.target_distance = 0.8
+        self.target_distance = 0.6
         
         for det in results.boxes:
             for i in range(len(det.cls)):
@@ -134,7 +141,7 @@ class DetectPersonNode(Node):
 
                 if label.lower() == "person":
                     self.get_logger().info('사람 감지')
-                    self.is_detect_person = True
+                    self.is_guiding = True
                     
                     conf = float(det.conf[0])
                     x1, y1, x2, y2 = map(int, det.xyxy[0].tolist())
@@ -167,7 +174,7 @@ class DetectPersonNode(Node):
 
 
                     pt_map = self.tf_buffer.transform(pt_camera, 'map', timeout=Duration(seconds=1.0))
-                    self.get_logger().info(f"Map coordinate: ({pt_map.point.x:.2f}, {pt_map.point.y:.2f}, {pt_map.point.z:.2f}), isTaskComplete: {self.navigator.isTaskComplete()}")
+                    # self.get_logger().info(f"Map coordinate: ({pt_map.point.x:.2f}, {pt_map.point.y:.2f}, {pt_map.point.z:.2f})")
 
                     dx = pt_map.point.x - robot_x
                     dy = pt_map.point.y - robot_y
@@ -192,35 +199,39 @@ class DetectPersonNode(Node):
                     robot_w = t.transform.rotation.w
                     goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=robot_z, w=robot_w)
                     
+                    self.display_frame = frame
+                    self.get_logger().info(f'is_guild: {self.is_guiding}')
+                    
                     # 순찰중 사람 발견
                     if not self.is_guiding:
-                        self.navigator.goToPose(goal_pose)
+                        self.approach_action = self.navigator.startToPose(goal_pose)
                         self.is_guiding = True
                     
+                if self.is_guiding:
+                    
+                    self.get_logger().info(f"is_task: {self.navigator.isTaskComplete()}, is_arrive: {self.is_arrived}")
+                    
                     # 이동 진행중
-                    if not self.navigator.isTaskComplete():
+                    if not self.approach_action:
                         self.is_arrived = False
                         self.get_logger().info(f"타겟으로 진행중 / 현재 좌표 : {robot_x}, {robot_y}")
                     else:
                         self.get_logger().info("타겟 도착 완료")
                         self.is_arrived = True
-                        time.sleep(2)
+                        time.sleep(4)
                         
                         # 대피소 위치
                         shelter_pose = self.navigator.getPoseStamped([1.8689, 1.4689], TurtleBot4Directions.SOUTH)
-                        self.navigator.goToPose(shelter_pose)
+                        self.shelter_action = self.navigator.startToPose(shelter_pose)
                         
                         self.get_logger().info("대피소 이동")
                         
-                        if self.navigator.isTaskComplete():
+                        if self.shelter_action:
                             self.is_arrived = True
                             
-                            time.sleep(2)
+                            time.sleep(4)
                             
                             self.is_guiding = False
-                        
-                    
-        self.display_frame = frame
 
     def display_loop(self):
         while rclpy.ok():
@@ -241,10 +252,17 @@ class DetectPersonNode(Node):
         arrived_msg = Bool()
         arrived_msg.data = self.is_arrived
         self.arrived_pub.publish(arrived_msg)
+        
+    def blocking_sleep(self):
+        time.sleep(2)
+        self.get_logger().info("2초 후 실행됨!")
 
 def main():        
     rclpy.init()
     node = DetectPersonNode()
+    
+    executor = rclpy.executors.MultiThreadedExecutor()
+    executor.add_node(node)
 
     try:
         rclpy.spin(node)
