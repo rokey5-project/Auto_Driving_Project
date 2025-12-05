@@ -151,13 +151,10 @@ local_costmap:
       resolution: 0.06
       robot_radius: 0.175
       plugins: ["static_layer", "voxel_layer", "inflation_layer"]
-      obstacle_layer:
-        observation_sources: scan
-        scan: {sensor_frame: lidar_link, data_type: LaserScan, expected_update_rate: 20.0, marking: true, clearing: true}
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.13
+        inflation_radius: 0.25
       voxel_layer:
         plugin: "nav2_costmap_2d::VoxelLayer"
         enabled: True
@@ -215,7 +212,7 @@ global_costmap:
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
         cost_scaling_factor: 4.0
-        inflation_radius: 0.13
+        inflation_radius: 0.2
       always_send_full_costmap: True
 
 planner_server:
