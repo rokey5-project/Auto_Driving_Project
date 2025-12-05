@@ -18,10 +18,6 @@ class PatrolNode(Node):
         self.navigator = TurtleBot4Navigator()
         self.navigator.waitUntilNav2Active()
         
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.EAST)
-        self.navigator.setInitialPose(initial_pose)
-        self.navigator.undock()
-        
         self.goal_pose = []
 
         self.goal_pose.append(self.navigator.getPoseStamped([0.01164, 1.536432], TurtleBot4Directions.SOUTH))
@@ -30,7 +26,12 @@ class PatrolNode(Node):
         self.goal_pose.append(self.navigator.getPoseStamped([-1.641019, -0.19269], TurtleBot4Directions.EAST))
         self.goal_pose.append(self.navigator.getPoseStamped([-0.015362, 0.440271], TurtleBot4Directions.WEST))
         
-        self.create_timer(0.2, self.patrol_loop) 
+        if self.fire_state:
+            initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.EAST)
+            self.navigator.setInitialPose(initial_pose)
+            self.navigator.undock()
+            
+            self.create_timer(0.2, self.patrol_loop) 
         
 
     def fire_callback(self, msg):
