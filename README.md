@@ -53,7 +53,7 @@ CCTV(webcam)를 통해 화재를 감지하고, 그 즉시 화재 대응 로봇(R
 
 <br>
 
-## 🧑‍💻 팀 구성 및 역할
+## 🧑‍🤝‍🧑 팀 구성 및 역할
 
 
 | 조원 | 역할 | 담당 업무 |
@@ -83,14 +83,15 @@ CCTV(webcam)를 통해 화재를 감지하고, 그 즉시 화재 대응 로봇(R
 
 <br>
 
-## 🙉 시연 영상
+## 🎥 시연 영상
 
-![시연 영상](https://blog.kakaocdn.net/dna/YftCE/dJMcafyj0BC/AAAAAAAAAAAAAAAAAAAAAKsnyQGjXN8ehHwD_1n4Ncm3yaxQUk99SPmeHjSWnOxI/img.gif?credential=yqXZFxpELC7KVnFOS48ylbz2pIh7yKj8&expires=1767193199&allow_ip=&allow_referer=&signature=6TGSqg%2F5i4%2FcEaZEhc8SH1gjeNY%3D)
-
+<img src="./assets/demonstration.gif" width=80% height=60%>
+<img src="./assets/website_demo1.gif" width=80% height=60%>
+<img src="./assets/website_demo2.gif" width=80% height=60%>
 
 <br>
 
-## 🔧 평가 및 피드백
+## 🛠️ 평가 및 피드백
 
 ### 완성도 평가
 - 계획했던 핵심 기능 (화재 감지 - 로봇 대응 - 모니터링) 구현
