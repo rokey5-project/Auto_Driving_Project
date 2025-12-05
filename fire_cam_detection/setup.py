@@ -25,7 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'yolo_detection = fire_cam_detection.yolo_detect:main',
-            'test = fire_cam_detection.assem1:main',
+            'test = fire_cam_detection.robotA:main',
             'test2 = fire_cam_detection.test1:main',
         ],
     },
