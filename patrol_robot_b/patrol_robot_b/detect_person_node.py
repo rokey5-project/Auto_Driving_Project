@@ -14,7 +14,6 @@ from sensor_msgs.msg import Image, CameraInfo, CompressedImage
 from geometry_msgs.msg import PointStamped, PoseStamped, Quaternion
 from std_msgs.msg import Bool
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Navigator, TurtleBot4Directions
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import tf2_geometry_msgs 
 
 
@@ -29,14 +28,12 @@ class DetectPersonNode(Node):
         self.camera_frame = None
         self.rgb_image_stamp = None
         self.shutdown_requested = False
+        self.goal_pose = None
         
-        self.is_navigating = False
-        self.is_arrived = False
-        self.is_guiding = False
-        
-        self.approach_action = False
-        self.shelter_action = False
-                
+        self.is_navigating = False # 이동 중 여부
+        self.is_arrived = False # 목적이 도착 여부
+        self.is_guiding = False # 대피소 안내 여부 (True: 대피소 이동중, False: 순찰중)
+
         self.navigator = TurtleBot4Navigator()
 
         self.model = YOLO("./yolov8n.pt")
@@ -54,18 +51,14 @@ class DetectPersonNode(Node):
         self.arrived_pub = self.create_publisher(Bool, "/is_arrived", 10)
         self.guiding_pub = self.create_publisher(Bool, "/is_guiding", 10)
         
-        qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
-            history=HistoryPolicy.KEEP_LAST,
-            depth=1
-        )
-
         # subscriptions
-        self.create_subscription(CameraInfo, '/robot6/oakd/rgb/camera_info', self.camera_info_callback, qos)
-        self.create_subscription(CompressedImage, '/robot6/oakd/rgb/image_raw/compressed', self.rgb_callback, qos)
-        self.create_subscription(Image, '/robot6/oakd/stereo/image_raw', self.depth_callback,qos)
+        self.create_subscription(CameraInfo, '/robot6/oakd/rgb/camera_info', self.camera_info_callback, 10)
+        self.create_subscription(CompressedImage, '/robot6/oakd/rgb/image_raw/compressed', self.rgb_callback, 10)
+        self.create_subscription(Image, '/robot6/oakd/stereo/image_raw', self.depth_callback,10)
 
         self.get_logger().info("TF Tree 안정화 시작. 5초 후 변환 시작합니다.")
+        
+        # timer
         self.start_timer = self.create_timer(5.0, self.start_transform)
         self.guiding_timer = self.create_timer(0.2, self.publishing_guiding)
         self.arrived_timer = self.create_timer(0.2, self.publishing_arrived) 
@@ -132,6 +125,7 @@ class DetectPersonNode(Node):
         robot_x = t.transform.translation.x
         robot_y = t.transform.translation.y
 
+        # 타겟 위치와 일정 거리
         self.target_distance = 0.6
         
         for det in results.boxes:
@@ -139,9 +133,8 @@ class DetectPersonNode(Node):
                 cls = int(det.cls[i])
                 label = self.model.names[cls]
 
+                # 사람 감지
                 if label.lower() == "person":
-                    self.get_logger().info('사람 감지')
-                    
                     conf = float(det.conf[0])
                     x1, y1, x2, y2 = map(int, det.xyxy[0].tolist())
 
@@ -156,7 +149,6 @@ class DetectPersonNode(Node):
                     u = int((x1 + x2) // 2)
                     v = int((original_y1 + original_y2) // 2)
                     z = float(self.depth_image[v, u])
-                    
                     
                     # intrinsic 변환
                     fx, fy = self.K[0, 0], self.K[1, 1]
@@ -173,7 +165,7 @@ class DetectPersonNode(Node):
 
 
                     pt_map = self.tf_buffer.transform(pt_camera, 'map', timeout=Duration(seconds=1.0))
-                    # self.get_logger().info(f"Map coordinate: ({pt_map.point.x:.2f}, {pt_map.point.y:.2f}, {pt_map.point.z:.2f})")
+                    self.get_logger().info(f"Map coordinate: ({pt_map.point.x:.2f}, {pt_map.point.y:.2f}, {pt_map.point.z:.2f})")
 
                     dx = pt_map.point.x - robot_x
                     dy = pt_map.point.y - robot_y
@@ -187,48 +179,59 @@ class DetectPersonNode(Node):
                         goal_x = robot_x
                         goal_y = robot_y
                         
-                    goal_pose = PoseStamped()
-                    goal_pose.header.frame_id = 'map'
-                    goal_pose.header.stamp = self.get_clock().now().to_msg()
-                    goal_pose.pose.position.x = goal_x
-                    goal_pose.pose.position.y = goal_y
-                    goal_pose.pose.position.z = 0.0
+                    self.goal_pose = PoseStamped()
+                    self.goal_pose.header.frame_id = 'map'
+                    self.goal_pose.header.stamp = self.get_clock().now().to_msg()
+                    self.goal_pose.pose.position.x = goal_x
+                    self.goal_pose.pose.position.y = goal_y
+                    self.goal_pose.pose.position.z = 0.0
 
                     robot_z = t.transform.rotation.z
                     robot_w = t.transform.rotation.w
-                    goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=robot_z, w=robot_w)
+                    self.goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=robot_z, w=robot_w)
                     
                     self.display_frame = frame
-                    self.get_logger().info(f'is_guild: {self.is_guiding}')
                     
                     # 순찰중 사람 발견
                     if not self.is_guiding:
-                        self.approach_action = self.navigator.startToPose(goal_pose)
+                        self.get_logger().info(f'person detected')
                         self.is_guiding = True
-                    
-                if self.is_guiding:
-                    # 이동 진행중
-                    if not self.approach_action:
-                        self.is_arrived = False
-                        self.get_logger().info(f"타겟으로 진행중 / 현재 좌표 : {robot_x}, {robot_y}")
-                    else:
-                        self.get_logger().info("타겟 도착 완료")
-                        self.is_arrived = True
-                        time.sleep(4)
                         
-                        # 대피소 위치
-                        shelter_pose = self.navigator.getPoseStamped([1.8689, 1.4689], TurtleBot4Directions.SOUTH)
-                        self.shelter_action = self.navigator.startToPose(shelter_pose)
-                        
-                        self.get_logger().info("대피소 이동")
-                        
-                        if self.shelter_action:
-                            self.is_arrived = True
-                            
-                            time.sleep(4)
-                            
-                            self.is_guiding = False
+                        # patrol navigation cancel 되기까지 delay
+                        self.target_timer = self.create_timer(1, self.goToTarget)
+                        self.target_timer.cancel()
 
+                if self.is_guiding:
+                    # UNKNOWN = 0
+                    # SUCCEEDED = 1
+                    # CANCELED = 2
+                    # FAILED = 3
+                    if self.navigator.getResult() == 1:
+                        self.get_logger().info("Arrived completed")
+                        self.is_arrived = True
+                        
+                        self.shelter_timer = self.create_timer(3, self.goToShelter)
+                        
+                    else:
+                        self.is_arrived = False
+                        self.get_logger().info(f"Moving to Target / robot_pose : {robot_x}, {robot_y}")
+
+    def goToTarget(self):
+        self.self.navigator.goToPose(self.goal_pose)
+        
+    def goToShelter(self):
+        # 대피소 위치
+        shelter_pose = self.navigator.getPoseStamped([1.8689, 1.4689], TurtleBot4Directions.SOUTH)
+        self.navigator.goToPose(shelter_pose)
+        
+        self.get_logger().info("Moving to Shelter")
+        self.shelter_timer.cancel()
+        
+        # 좌표 이동 완료
+        if self.navigator.getResult() == 1:
+            self.is_arrived = True
+            self.is_guiding = False
+            
     def display_loop(self):
         while rclpy.ok():
             if self.display_frame is not None:
@@ -248,10 +251,6 @@ class DetectPersonNode(Node):
         arrived_msg = Bool()
         arrived_msg.data = self.is_arrived
         self.arrived_pub.publish(arrived_msg)
-        
-    def blocking_sleep(self):
-        time.sleep(2)
-        self.get_logger().info("2초 후 실행됨!")
 
 def main():        
     rclpy.init()

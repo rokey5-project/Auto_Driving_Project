@@ -16,7 +16,6 @@ class BuzzerNode(Node):
         self.is_arrived = False
 
         self.audio_msg = AudioNoteVector()
-        
         self.audio_msg.append = False
         notes = [
             (880, 300000000),
@@ -36,7 +35,7 @@ class BuzzerNode(Node):
         
         if self.is_arrived:
             self.alarm_publisher.publish(self.audio_msg)
-            self.get_logger().info("🔊 삐뽀 재생!")
+            self.get_logger().info("🔊 Buzzer Play!")
         
         
 

@@ -12,8 +12,7 @@ class PatrolNode(Node):
         self.create_subscription(Bool, "/is_guiding", self.guiding_callback, 10)
 
         self.position_index = 0
-        # 토픽 받아오는걸로 변경 필요
-        self.fire_state = True
+        self.fire_state = False
         self.is_guiding = False
 
         self.navigator = TurtleBot4Navigator()
@@ -43,21 +42,21 @@ class PatrolNode(Node):
             self.is_guiding = msg.data
             
             if self.is_guiding:
-                self.get_logger().info("🚨 사람 발견! 순찰 정지")
+                self.get_logger().info("🚨 Person found! Patrol stopped.")
                 self.navigator.cancelTask()
         
     def patrol_loop(self):
         if not self.navigator.isTaskComplete():
-            self.get_logger().info('순찰중입니다!!')
+            self.get_logger().info('On patrol')
             return
             
         if not self.navigator.getDockedStatus() and not self.fire_state:
+            self.get_logger().info("🔥 No fire. Docking in progress.")
             self.navigator.dock()
-            self.get_logger().info("🔥 화재 없음. 도킹 상태")
             return
         
         if not self.is_guiding:    
-            self.get_logger().info(f"순찰 시작: 목표 지점 {self.position_index}")
+            self.get_logger().info(f"Start to Patrol: Target Pose - {self.position_index}")
             goal = self.goal_pose[self.position_index]
             self.navigator.goToPose(goal)
                 
